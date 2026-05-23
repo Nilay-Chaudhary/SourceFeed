@@ -1,0 +1,106 @@
+spring:
+  application:
+    name: social-feed
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: timeline-consumer-group
+      embeddings-group-id: embeddings-consumer-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: com.socialfeed.event.PostCreatedEvent
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      verification-group-id: verification-consumer-group
+
+server:
+  port: ${SERVER_PORT}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 86400000 # 24 hours
+
+kafka:
+  topics:
+    post-created: post-created-topic
+    post-created-dlt: post-created-topic.dlt
+    notifications: notifications
+    notifications-dlt: notifications.dlt
+
+ai:
+  fallback-enabled: true
+
+huggingface:
+  spaces-url: ${HF_SPACES_URL}  
+  api-key: ${HF_API_KEY}
+  model: meta-llama/Llama-2-7b-chat
+  max-tokens: 1000
+  timeout-seconds: 200
+  use-verify-endpoint: true
+
+groq:
+  api-key: ${GROQ_API_KEY}
+  model: qwen/qwen3-32b
+  max-tokens: 200
+  timeout-seconds: 30
+
+logging:
+  file:
+    name: logs/social-feed.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 14
+      total-size-cap: 500MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+management.metrics.distribution.percentiles-histogram.kafka_event_processing_duration: true
+management.metrics.distribution.percentiles-histogram.ai_verification_processing_duration: true
+
+app:
+  posts:
+    trusted-source-domains: arxiv.org,github.com,paperswithcode.com,doi.org,openreview.net,huggingface.co,aclanthology.org
+    trusted-source-boost-per-match: 0.25
+    max-source-trust-boost: 0.75

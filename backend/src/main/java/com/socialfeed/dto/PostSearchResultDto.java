@@ -1,0 +1,13 @@
+package com.socialfeed.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PostSearchResultDto {
+    private PostDto post;
+    private Double relevanceScore;
+}
