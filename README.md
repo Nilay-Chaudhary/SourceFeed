@@ -33,8 +33,6 @@ prometheus.yml   Prometheus scrape configuration
 
 ## Architecture
 
-### Presentation View
-
 ```mermaid
 flowchart LR
     U[Users] --> FE[Frontend]
@@ -47,74 +45,6 @@ flowchart LR
     M --> P[Prometheus]
     P --> G[Grafana]
 ```
-
-### Detailed Engineering View
-
-```mermaid
-flowchart TD
-    U[User] --> FE[Frontend React + Vite]
-    FE -->|HTTP /api| API[Spring Boot API]
-
-    subgraph Core[Backend Core]
-        API --> AUTH[Auth + JWT]
-        API --> POSTS[Post Controller + Service]
-        API --> USERS[User + Follow Service]
-        API --> TL[Timeline Query Service]
-    end
-
-    subgraph DB[PostgreSQL]
-        UDB[(users, follows)]
-        PDB[(posts)]
-        TDB[(timeline materialized view)]
-        NDB[(notifications)]
-    end
-
-    USERS --> UDB
-    POSTS --> PDB
-    TL --> TDB
-
-    subgraph Kafka[Kafka Topics]
-        T1[[post-created-topic]]
-        T2[[notifications]]
-        T3[[post-created-topic.dlt]]
-        T4[[notifications.dlt]]
-    end
-
-    POSTS -->|publish post-created| T1
-    T1 --> C1[PostCreatedConsumer]
-    C1 -->|fan-out to followers| TDB
-    C1 -->|emit notification events| T2
-
-    T2 --> C2[NotificationConsumer]
-    C2 --> NDB
-
-    T1 --> C3[PostEmbeddingsConsumer]
-    C3 --> C4[VerificationConsumer]
-
-    C1 -. failures .-> T3
-    C2 -. failures .-> T4
-
-    API -->|/timeline| TL
-    FE -->|timeline / for-you| API
-
-    subgraph Obs[Observability]
-        ACT[Actuator /actuator/prometheus]
-        PROM[Prometheus]
-        GRAF[Grafana Dashboards]
-    end
-
-    API --> ACT
-    ACT --> PROM
-    PROM --> GRAF
-```
-
-Request flow summary:
-
-1. Frontend calls backend APIs for auth, posting, follow actions, and timeline reads.
-2. New posts are persisted and published to Kafka (`post-created-topic`).
-3. Consumers materialize follower timelines and notifications asynchronously.
-4. Dead-letter topics capture failed event processing for replay/inspection.
-5. Prometheus scrapes backend metrics and Grafana visualizes them.
 
 ## Environment Setup
 
