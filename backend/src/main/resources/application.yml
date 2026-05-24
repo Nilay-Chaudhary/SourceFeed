@@ -100,6 +100,8 @@ management.metrics.distribution.percentiles-histogram.kafka_event_processing_dur
 management.metrics.distribution.percentiles-histogram.ai_verification_processing_duration: true
 
 app:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
   posts:
     trusted-source-domains: arxiv.org,github.com,paperswithcode.com,doi.org,openreview.net,huggingface.co,aclanthology.org
     trusted-source-boost-per-match: 0.25
