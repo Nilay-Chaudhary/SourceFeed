@@ -19,6 +19,7 @@ import com.socialfeed.repository.UserRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -62,9 +63,12 @@ public class PostService {
     private final FollowRepository followRepository;
     private final TrustAggregateService trustAggregateService;
     private final TopicReputationService topicReputationService;
-    private final KafkaTemplate<String, PostCreatedEvent> kafkaTemplate;
-    private final KafkaTemplate<String, NotificationEvent> notificationKafkaTemplate;
+    private final ObjectProvider<KafkaTemplate<String, PostCreatedEvent>> kafkaTemplateProvider;
+    private final ObjectProvider<KafkaTemplate<String, NotificationEvent>> notificationKafkaTemplateProvider;
     private final MeterRegistry meterRegistry;
+
+    @Value("${app.kafka.enabled:false}")
+    private boolean kafkaEnabled;
 
     @Value("${kafka.topics.post-created}")
     private String postCreatedTopic;
@@ -223,6 +227,17 @@ public class PostService {
     }
 
     private void publishPostCreatedEventAfterCommit(String messageKey, PostCreatedEvent event) {
+        if (!kafkaEnabled) {
+            log.info("Kafka disabled; skipping post created event publish: postId={}, eventId={}", event.getPostId(), event.getEventId());
+            return;
+        }
+
+        KafkaTemplate<String, PostCreatedEvent> kafkaTemplate = kafkaTemplateProvider.getIfAvailable();
+        if (kafkaTemplate == null) {
+            log.info("Kafka template unavailable; skipping post created event publish: postId={}, eventId={}", event.getPostId(), event.getEventId());
+            return;
+        }
+
         Runnable publish = () -> kafkaTemplate.send(postCreatedTopic, messageKey, event)
             .whenComplete((result, ex) -> {
                 if (ex == null) {
@@ -258,6 +273,17 @@ public class PostService {
     }
 
     private void publishNotificationEventAfterCommit(String messageKey, NotificationEvent event) {
+        if (!kafkaEnabled) {
+            log.info("Kafka disabled; skipping notification event publish: userId={}, type={}", event.getUserId(), event.getType());
+            return;
+        }
+
+        KafkaTemplate<String, NotificationEvent> notificationKafkaTemplate = notificationKafkaTemplateProvider.getIfAvailable();
+        if (notificationKafkaTemplate == null) {
+            log.info("Kafka template unavailable; skipping notification event publish: userId={}, type={}", event.getUserId(), event.getType());
+            return;
+        }
+
         Runnable publish = () -> notificationKafkaTemplate.send(notificationsTopic, messageKey, event)
             .whenComplete((result, ex) -> {
                 if (ex == null) {
