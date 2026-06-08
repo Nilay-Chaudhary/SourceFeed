@@ -102,3 +102,55 @@ Install k6 and run:
 ```powershell
 k6 run load-tests/social-feed-load.js
 ```
+
+## EC2 Deployment
+
+The backend is container-ready, so the simplest EC2 setup is Docker Compose on a single instance. The repo includes a deployment stack in `deploy/docker-compose.ec2.yml` that runs the backend, PostgreSQL, Kafka, Zookeeper, Prometheus, and Grafana together.
+
+### 1. Prepare the EC2 instance
+
+Use an Amazon Linux 2023 or Ubuntu EC2 instance with at least 2 vCPU and 4 to 8 GB RAM. Open these inbound ports in the security group:
+
+- `22` for SSH
+- `8080` for the backend API
+- `3000` for Grafana
+- `9090` for Prometheus if you want direct access
+
+Keep `5432` and `9092` closed unless you explicitly need direct database or broker access.
+
+### 2. Install Docker and Compose
+
+On Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-plugin
+sudo usermod -aG docker ubuntu
+sudo systemctl enable --now docker
+```
+
+### 3. Configure environment variables
+
+Copy `deploy/.env.example` to `deploy/.env` and set real values for:
+
+- `POSTGRES_PASSWORD`
+- `JWT_SECRET`
+- `GRAFANA_ADMIN_PASSWORD`
+
+If your frontend will call the EC2 backend directly, set `CORS_ALLOWED_ORIGINS` to your frontend origin.
+
+### 4. Start the stack
+
+From the repository root:
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.ec2.yml up -d --build
+```
+
+### 5. Verify
+
+- Backend health: `http://<EC2_PUBLIC_IP>:8080/actuator/health`
+- Prometheus: `http://<EC2_PUBLIC_IP>:9090`
+- Grafana: `http://<EC2_PUBLIC_IP>:3000`
+
+Grafana is already wired to Prometheus through the provisioning files in `grafana/provisioning/`.
